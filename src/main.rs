@@ -57,7 +57,7 @@ async fn main() {
 
     loop {
         let delta = get_frame_time();
-
+//
         // UPDATE
 
         {
