@@ -1,4 +1,12 @@
 use macroquad::prelude::*;
+use midir::PortInfoError;
+use std::fs;
+use nodi::{
+	midly::{Format, Smf},
+    midir::{MidiOutput, MidiOutputConnection},
+	timers::Ticker,
+	Player, Sheet,
+};
 
 mod bouncer;
 mod ourguy;
@@ -26,6 +34,43 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     let mut guy: OurGuy = OurGuy::new(200f32, 200f32);
+
+    let data = fs::read("res/song.mid").unwrap();
+    let smf = midly::Smf::parse(&data).unwrap();
+    println!("this midi files has {} tracks", smf.tracks.len());
+    for (i, track) in smf.tracks.iter().enumerate() {
+        println!("track {} has {} events", i, track.len())
+        
+    }
+    let timer = Ticker::try_from(smf.header.timing).unwrap();
+
+    let midi_out = MidiOutput::new("play_midi").unwrap();
+    let output_ports = midi_out.ports();
+
+    if output_ports.is_empty() {
+        println!("no MIDI device detected");
+        panic!();
+    }
+    else {
+        for (i, port) in output_ports.iter().enumerate() {
+            println!("{}, {}", i, midi_out.port_name(port).as_deref().unwrap());
+        }
+    }
+
+
+
+    // WE ARE GOING TO USE DEFAULT DEVICE 0 IF THIS DOESN'T WORK YOU NEED TO LIST MIDI DEVICES
+    let output_port = &output_ports[1];
+    let con = midi_out.connect(output_port, "deez").unwrap();
+
+    let sheet = match smf.header.format {
+        Format::SingleTrack | Format::Sequential => Sheet::sequential(&smf.tracks),
+        Format::Parallel => Sheet::parallel(&smf.tracks)
+    };
+
+    let mut player = Player::new(timer, con);
+
+    player.play(&sheet);
 
     let mut bouncers: Vec<Bouncer> = vec![];
     let map = vec![
